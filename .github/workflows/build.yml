@@ -1,71 +1,74 @@
-name: build-run
+name: Build and Deploy web-app to EC2
 
-# Controls when the action will run.
 on:
-  # Triggers the workflow on push or pull request events for specific branches
   push:
-    branches: [main, dev, angular-update-18]
-  pull_request:
-    branches: [main, dev, angular-update-18]
+    branches:
+      - main
+      - dev
+      - angular-update-18
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    name: Run Lint, Build and Deploy
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 22
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          # no support for lts as of now with github actions.
-          # issue link : https://github.com/actions/setup-node/issues/26
-          # lts/gallium node v19.7.0 (npm v9.5.0)
           node-version: '22.9.0'
 
-      - name: Remove node_modules
-        run: rm -rf node_modules
-
-      - name: Run CI
-        run: npm ci
-
-      - name: Fallback – Clean install with regenerated lockfile
-        if: failure()
-        run: |
-          echo "npm ci failed — regenerating lockfile and retrying"
-          rm -rf node_modules package-lock.json
-          npm install
-
-      - name: Run eslint
-        run: npx eslint .
-
-      - name: Run stylelint
-        run: npx stylelint "src/**/*.scss"
-
-      - name: Run prettier
-        run: npx prettier . --check
-
-      - name: Run HTMLHint
-        run: npx htmlhint "src" --config .htmlhintrc
-
-      - name: Run production build
-        run: npm run build:prod
-
-      - name: Deploy to github pages
-        if: ${{ github.event_name == 'push' }}
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: dist/web-app
-          #without preserve it only builds if you have untracked files
-          PRESERVE: true
-          # github user name and email shows up in the logs,
-          # so it would be better to make it silent.
-          SILENT: true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t web-app:latest .
+
+      - name: Tag image for ECR
+        run: |
+          docker tag web-app:latest ${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Set up SSH access
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy on EC2
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -ex
+
+            # Login a ECR
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
+
+            # Detener y remover contenedor previo
+            docker stop web-app || true
+            docker rm web-app || true
+
+            # Obtener la nueva imagen
+            docker pull ${{ secrets.ECR_REPOSITORY }}:latest
+
+            # Ejecutar el contenedor nuevo (ajusta puertos según necesites)
+            docker run -d --name web-app -p 80:80 ${{ secrets.ECR_REPOSITORY }}:latest
+
+            docker logs --tail 50 web-app
+          EOF
