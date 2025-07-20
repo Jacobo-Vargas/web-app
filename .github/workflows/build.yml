@@ -69,8 +69,12 @@ jobs:
             # Obtener la nueva imagen
             docker pull ${{ secrets.ECR_REPOSITORY }}:latest
 
-            # Ejecutar el contenedor nuevo (ajusta puertos según necesites)
-            docker run -d --name web-app -p 80:80 ${{ secrets.ECR_REPOSITORY }}:latest
+            # Ejecutar el contenedor con los secrets
+            docker run -d --name web-app -p 80:80 \
+              -e FINERACT_API_URL="${{ secrets.FINERACT_API_URL }}" \
+              -e FINERACT_PLATFORM_TENANT_IDENTIFIER="${{ secrets.FINERACT_PLATFORM_TENANT_IDENTIFIER }}" \
+              -e MIFOS_DEFAULT_LANGUAGE="${{ secrets.MIFOS_DEFAULT_LANGUAGE }}" \
+              ${{ secrets.ECR_REPOSITORY }}:latest
 
             docker logs --tail 50 web-app
           EOF
