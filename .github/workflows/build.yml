@@ -3,9 +3,7 @@ name: Build and Deploy web-app to EC2
 on:
   push:
     branches:
-      - main
       - dev
-      - angular-update-18
 
 jobs:
   deploy:
