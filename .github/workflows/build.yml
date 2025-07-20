@@ -8,6 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FINERACT_API_URL: ${{ secrets.FINERACT_API_URL }}
+      FINERACT_PLATFORM_TENANT_IDENTIFIER: ${{ secrets.FINERACT_PLATFORM_TENANT_IDENTIFIER }}
+      MIFOS_DEFAULT_LANGUAGE: ${{ secrets.MIFOS_DEFAULT_LANGUAGE }}
     environment: production
 
     steps:
