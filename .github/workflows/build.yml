@@ -70,7 +70,7 @@ jobs:
             docker pull ${{ secrets.ECR_REPOSITORY }}:latest
 
             # Ejecutar el contenedor con los secrets
-            docker run -d --name web-app \
+            docker run -d --name web-app -p 8080:80 \
               -e FINERACT_API_URL="${{ secrets.FINERACT_API_URL }}" \
               -e FINERACT_PLATFORM_TENANT_IDENTIFIER="${{ secrets.FINERACT_PLATFORM_TENANT_IDENTIFIER }}" \
               -e MIFOS_DEFAULT_LANGUAGE="${{ secrets.MIFOS_DEFAULT_LANGUAGE }}" \
