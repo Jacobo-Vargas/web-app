@@ -1,7 +1,7 @@
 name: Test SSH Connection to EC2
 
 on:
-  workflow_dispatch:  # Para lanzarlo desde la pestaña de actions
+  workflow_dispatch:  # Para lanzarlo desde la pestaña de actions prueba
 
 jobs:
   ssh-test:
